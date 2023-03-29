@@ -22,7 +22,7 @@ static void ListIdFunction(DataChunk &args, ExpressionState &state, Vector &resu
 	// }
 
 	UnifiedVectorFormat lhs_data;
-	UnifiedVectorFormat rhs_data;
+	//UnifiedVectorFormat rhs_data;
 	lhs.ToUnifiedFormat(count, lhs_data);
 	// rhs.ToUnifiedFormat(count, rhs_data);
 	auto lhs_entries = (list_entry_t *)lhs_data.data;
