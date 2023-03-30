@@ -161,7 +161,12 @@ struct ListUniqueFun {
 	static void RegisterFunction(BuiltinFunctions &set);
 };
 
-struct ListSortFun {
+// struct ListSortFun {
+// 	static ScalarFunction GetFunction();
+// 	static void RegisterFunction(BuiltinFunctions &set);
+// };
+
+struct ListReverseFun {
 	static ScalarFunction GetFunction();
 	static void RegisterFunction(BuiltinFunctions &set);
 };
