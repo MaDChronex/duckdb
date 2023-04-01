@@ -359,3 +359,27 @@ void ListReverseFun::RegisterFunction(BuiltinFunctions &set) {
 	array_sort.AddFunction(sort_order);
 	array_sort.AddFunction(sort_orders);
 	set.AddFunction(array_sort);
+
+	// // reverse sort
+
+	// // one parameter: list
+	// ScalarFunction sort_reverse({LogicalType::LIST(LogicalType::ANY)}, LogicalType::LIST(LogicalType::ANY),
+	//                             ListReverseFunction, ListReverseSortBind);
+
+	// // two parameters: list, null order
+	// ScalarFunction sort_reverse_null_order({LogicalType::LIST(LogicalType::ANY), LogicalType::VARCHAR},
+	//                                        LogicalType::LIST(LogicalType::ANY), ListSortFunction, ListReverseSortBind);
+
+	// ScalarFunctionSet list_reverse_sort("list_reverse_sort");
+	// list_reverse_sort.AddFunction(sort_reverse);
+	// list_reverse_sort.AddFunction(sort_reverse_null_order);
+	// set.AddFunction(list_reverse_sort);
+
+	// ScalarFunctionSet array_reverse_sort("array_reverse_sort");
+	// array_reverse_sort.AddFunction(sort_reverse);
+	// array_reverse_sort.AddFunction(sort_reverse_null_order);
+	// set.AddFunction(array_reverse_sort);
+}
+
+} // namespace duckdb
+
