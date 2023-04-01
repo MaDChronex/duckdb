@@ -81,7 +81,7 @@ static unique_ptr<FunctionData> ListIdBind(ClientContext &context, ScalarFunctio
 	D_ASSERT(bound_function.arguments.size() == 2);
 
 	auto &lhs = arguments[0]->return_type;
-	auto &rhs = arguments[1]->return_type;
+	//auto &rhs = arguments[1]->return_type;
 	if (lhs.id() == LogicalTypeId::UNKNOWN 
 	// || rhs.id() == LogicalTypeId::UNKNOWN
 	) {

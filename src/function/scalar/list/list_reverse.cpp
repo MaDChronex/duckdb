@@ -72,7 +72,7 @@ ListReverseBindData::~ListReverseBindData() {
 // create the key_chunk and the payload_chunk and sink them into the local_sort_state
 void SinkDataChunkRev(Vector *child_vector, SelectionVector &sel, idx_t offset_lists_indices, vector<LogicalType> &types,
                    vector<LogicalType> &payload_types, Vector &payload_vector, LocalSortState &local_sort_state,
-                   bool &data_to_sort, Vector &lists_indices) {
+                   bool &data_to_reverse, Vector &lists_indices) {
 
 	// slice the child vector
 	Vector slice(*child_vector, sel, offset_lists_indices);
@@ -96,7 +96,7 @@ void SinkDataChunkRev(Vector *child_vector, SelectionVector &sel, idx_t offset_l
 	// sink
 	key_chunk.Flatten();
 	local_sort_state.SinkChunk(key_chunk, payload_chunk);
-	data_to_sort = true;
+	data_to_reverse = true;
 }
 
 static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -153,28 +153,33 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 
 	idx_t offset_lists_indices = 0;
 	uint32_t incr_payload_count = 0;
-	bool data_to_sort = false;
+	bool data_to_reverse = false;
+
+	// This is not working as intended, the selection vector is not being set correctly
+	// for (idx_t i = 0; i < count; i++)  {
+	// 	sel.set_index(i, count - i - 1);
+	// }
 
 	for (idx_t i = 0; i < count; i++) {
 		auto lists_index = lists_data.sel->get_index(i);
 		const auto &list_entry = list_entries[lists_index];
 
-		// nothing to do for this list
-		if (!lists_data.validity.RowIsValid(lists_index)) {
-			result_validity.SetInvalid(i);
-			continue;
-		}
+		// // nothing to do for this list
+		// if (!lists_data.validity.RowIsValid(lists_index)) {
+		// 	result_validity.SetInvalid(i);
+		// 	continue;
+		// }
 
-		// empty list, no sorting required
-		if (list_entry.length == 0) {
-			continue;
-		}
+		// // empty list, no sorting required
+		// if (list_entry.length == 0) {
+		// 	continue;
+		// }
 
 		for (idx_t child_idx = 0; child_idx < list_entry.length; child_idx++) {
 			// lists_indices vector is full, sink
 			if (offset_lists_indices == STANDARD_VECTOR_SIZE) {
 				SinkDataChunkRev(&child_vector, sel, offset_lists_indices, info.types, info.payload_types, payload_vector,
-				              local_sort_state, data_to_sort, lists_indices);
+				              local_sort_state, data_to_reverse, lists_indices);
 				offset_lists_indices = 0;
 			}
 
@@ -188,19 +193,22 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 			offset_lists_indices++;
 			incr_payload_count++;
 
-		// Reverse the order of sel.
+		// Reverse the order of sel. ------------------------------------------------
 		}
-		for (i = 0; i < list_entry.length; i++)  {
-			sel.set_index(i, list_entry.length - i - 1);
-		}
+		// for (i = 0; i < list_entry.length; i++)  {
+		// 	sel.set_index(i, list_entry.length - i - 0);
+		// 	// for debugging
+		// 	sel.Print(list_entry.length);
+		// 	sel.Print(i);
+		// }
 	}
 
 	if (offset_lists_indices != 0) {
 		SinkDataChunkRev(&child_vector, sel, offset_lists_indices, info.types, info.payload_types, payload_vector,
-		              local_sort_state, data_to_sort, lists_indices);
+		              local_sort_state, data_to_reverse, lists_indices);
 	}
 
-	if (data_to_sort) {
+	if (data_to_reverse) {
 		// add local state to global state, which sorts the data
 		global_sort_state.AddLocalState(local_sort_state);
 		global_sort_state.PrepareMergePhase();
@@ -208,6 +216,7 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 		// selection vector that is to be filled with the 'sorted' payload
 		SelectionVector sel_sorted(incr_payload_count);
 		idx_t sel_sorted_idx = 0;
+		
 
 		// scan the sorted row data
 		PayloadScanner scanner(*global_sort_state.sorted_blocks[0]->payload_data, global_sort_state);
@@ -226,7 +235,8 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 			auto row_count = result_chunk.size();
 
 			for (idx_t i = 0; i < row_count; i++) {
-				sel_sorted.set_index(sel_sorted_idx, result_data[i]);
+				//sel_sorted.set_index(sel_sorted_idx, result_data[i]);
+				sel_sorted.set_index(row_count - i - 1, result_data[i]);
 				D_ASSERT(result_data[i] < lists_size);
 				sel_sorted_idx++;
 			}
@@ -360,25 +370,6 @@ void ListReverseFun::RegisterFunction(BuiltinFunctions &set) {
 	array_sort.AddFunction(sort_orders);
 	set.AddFunction(array_sort);
 
-	// // reverse sort
-
-	// // one parameter: list
-	// ScalarFunction sort_reverse({LogicalType::LIST(LogicalType::ANY)}, LogicalType::LIST(LogicalType::ANY),
-	//                             ListReverseFunction, ListReverseSortBind);
-
-	// // two parameters: list, null order
-	// ScalarFunction sort_reverse_null_order({LogicalType::LIST(LogicalType::ANY), LogicalType::VARCHAR},
-	//                                        LogicalType::LIST(LogicalType::ANY), ListSortFunction, ListReverseSortBind);
-
-	// ScalarFunctionSet list_reverse_sort("list_reverse_sort");
-	// list_reverse_sort.AddFunction(sort_reverse);
-	// list_reverse_sort.AddFunction(sort_reverse_null_order);
-	// set.AddFunction(list_reverse_sort);
-
-	// ScalarFunctionSet array_reverse_sort("array_reverse_sort");
-	// array_reverse_sort.AddFunction(sort_reverse);
-	// array_reverse_sort.AddFunction(sort_reverse_null_order);
-	// set.AddFunction(array_reverse_sort);
 }
 
 } // namespace duckdb
