@@ -7,7 +7,7 @@
 namespace duckdb {
 
 static void ListIdFunction(DataChunk &args, ExpressionState &state, Vector &result) {
-	D_ASSERT(args.ColumnCount() == 2);
+	D_ASSERT(args.ColumnCount() == 1);
 	auto count = args.size();
 
 	Vector &lhs = args.data[0];
@@ -78,7 +78,7 @@ static void ListIdFunction(DataChunk &args, ExpressionState &state, Vector &resu
 
 static unique_ptr<FunctionData> ListIdBind(ClientContext &context, ScalarFunction &bound_function,
                                                vector<unique_ptr<Expression>> &arguments) {
-	D_ASSERT(bound_function.arguments.size() == 2);
+	D_ASSERT(bound_function.arguments.size() == 1);
 
 	auto &lhs = arguments[0]->return_type;
 	//auto &rhs = arguments[1]->return_type;
