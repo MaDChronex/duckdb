@@ -11,15 +11,6 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 	auto count = args.size();
 
 	Vector &lhs = args.data[0];
-	// Vector &rhs = args.data[1];
-	// if (lhs.GetType().id() == LogicalTypeId::SQLNULL) {
-	// 	result.Reference(rhs);
-	// 	return;
-	// }
-	// if (rhs.GetType().id() == LogicalTypeId::SQLNULL) {
-	// 	result.Reference(lhs);
-	// 	return;
-	// }
 
 	UnifiedVectorFormat lhs_data;
 	//UnifiedVectorFormat rhs_data;
@@ -41,13 +32,15 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 	auto result_entries = FlatVector::GetData<list_entry_t>(result);
 	auto &result_validity = FlatVector::Validity(result);
 
-	
+	// Create a reverse selection vector
+	SelectionVector rev1(lhs_list_size);
+	for (idx_t i = 0; i < lhs_list_size; i++) {
+		rev1.set_index(lhs_list_size - i - 1, i);
+	}
 
 	idx_t offset = 0;
 	for (idx_t i = 0; i < count; i++) {
 		auto lhs_list_index = lhs_data.sel->get_index(i);
-		
-		//lhs_data.sel.set_index(count - i - 1, i);
 
 		// auto rhs_list_index = rhs_data.sel->get_index(i);
 		if (!lhs_data.validity.RowIsValid(lhs_list_index)
@@ -61,34 +54,17 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 		if (lhs_data.validity.RowIsValid(lhs_list_index)) {
 			const auto &lhs_entry = lhs_entries[lhs_list_index];
 			result_entries[i].length += lhs_entry.length;
-			// This is goood------------------
-			// Vector rev = Vector(lhs_child, *lhs_child_data.sel, lhs_entry.length);
+
+			// Create a reverse selection vector
+			// SelectionVector rev(lhs_entry.length);
 			// for (idx_t i = 0; i < lhs_entry.length; i++) {
-			// 	rev.SetValue(i, result.GetValue(lhs_entry.length - i - 1));
-			// 	rev.Print(i);
-			// 	//lhs_child_data.sel->set_index(lhs_entry.length - i - 1, i);
-			// 	//lhs_child_data.sel->Print(lhs_entry.length-i-1);
+			// 	rev.set_index(lhs_entry.length - i - 1, i);
 			// }
-			//--------------------------------
-			SelectionVector rev(lhs_entry.length);
-			for (idx_t i = 0; i < lhs_entry.length; i++) {
-				rev.set_index(lhs_entry.length - i - 1, i);
-				//rev.Print(lhs_entry.length-i-1);
-				//lhs_child_data.sel->set_index(lhs_entry.length - i - 1, i);
-				//lhs_child_data.sel->Print(lhs_entry.length-i-1);
-			}
-			ListVector::Append(result, lhs_child, rev, lhs_entry.offset + lhs_entry.length,
+			ListVector::Append(result, lhs_child, rev1, lhs_entry.offset + lhs_entry.length,
 			                   lhs_entry.offset);
-			// DUCKDB_API static void Append(Vector &target, const Vector &source, const SelectionVector &sel, idx_t source_size,
-	        //                       idx_t source_offset = 0);
 		}
 
-		// if (rhs_data.validity.RowIsValid(rhs_list_index)) {
-		// 	const auto &rhs_entry = rhs_entries[rhs_list_index];
-		// 	result_entries[i].length += rhs_entry.length;
-		// 	ListVector::Append(result, rhs_child, *rhs_child_data.sel, rhs_entry.offset + rhs_entry.length,
-		// 	                   rhs_entry.offset);
-		// }
+
 		offset += result_entries[i].length;
 	}
 	D_ASSERT(ListVector::GetListSize(result) == offset);
@@ -98,15 +74,6 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 	 ) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
 	}
-	// SelectionVector selection_V = SelectionVector(count);
-	// for (idx_t i = 0; i < count; i++) {
-	// 	selection_V.set_index(count - i - 1, i);
-	// 	selection_V.Print(count);
-	// }
-	
-	// Vector result_rev = Vector (result, selection_V, count);
-	
-	// result.Reinterpret(result_rev);
 }
 
 
@@ -129,15 +96,6 @@ static unique_ptr<FunctionData> ListReverseBind(ClientContext &context, ScalarFu
 	} else {
 		D_ASSERT(lhs.id() == LogicalTypeId::LIST);
 	
-	// 	auto return_type = rhs.id() == LogicalTypeId::SQLNULL ? lhs: rhs;
-	// 	bound_function.arguments[0] = return_type;
-	// 	bound_function.arguments[1] = return_type;
-	// 	bound_function.return_type = return_type;
-	// } else {
-	// 	D_ASSERT(lhs.id() == LogicalTypeId::LIST);
-	// 	D_ASSERT(rhs.id() == LogicalTypeId::LIST);
-
-		// Resolve list type
 		LogicalType child_type = LogicalType::SQLNULL;
 		for (const auto &argument : arguments) {
 			child_type = LogicalType::MaxLogicalType(child_type, ListType::GetChildType(argument->return_type));
