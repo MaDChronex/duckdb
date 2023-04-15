@@ -1,0 +1,37 @@
+# name: test/sql/types/nested/list/test_list_reverse.test
+# description: Test reversing the order of the elements of a list
+# group: [list]
+
+statement ok
+PRAGMA enable_verification
+
+query I
+SELECT LIST_REVERSE(ARRAY[NULL])
+----
+[NULL]
+
+query I
+SELECT LIST_REVERSE(ARRAY[])
+----
+[]
+
+query I
+SELECT LIST_REVERSE(ARRAY[1, 42, 2])
+----
+[2, 42, 1]
+
+query I
+SELECT LIST_REVERSE(ARRAY[1, 42, NULL, 2])
+----
+[2, NULL, 42, 1]
+
+query I
+SELECT LIST_REVERSE(NULL)
+----
+NULL
+
+statement error
+SELECT LIST_REVERSE()
+
+statement error
+SELECT LIST_REVERSE(42)
