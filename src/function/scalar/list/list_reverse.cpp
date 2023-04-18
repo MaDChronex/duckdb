@@ -10,97 +10,76 @@ static void ListReverseFunction(DataChunk &args, ExpressionState &state, Vector 
 	D_ASSERT(args.ColumnCount() == 1);
 	auto count = args.size();
 
-	Vector nul(0);
-
-	Vector &arrlist = args.data[0];
-		if (arrlist.GetType().id() == LogicalTypeId::SQLNULL) {
+	Vector &input_list = args.data[0];
+		if (input_list.GetType().id() == LogicalTypeId::SQLNULL) {
 			result.SetVectorType(VectorType::CONSTANT_VECTOR);
 			ConstantVector::SetNull(result, true);
-			// result.Reference(nul); //should be NULL not 0
 		return;
 	}
 
-	UnifiedVectorFormat arrlist_data;
-	arrlist.ToUnifiedFormat(count, arrlist_data);
-	auto arrlist_entries = (list_entry_t *)arrlist_data.data;
+	UnifiedVectorFormat input_list_data;
+	input_list.ToUnifiedFormat(count, input_list_data);
+	auto input_list_entries = (list_entry_t *)input_list_data.data;
 
-	auto arrlist_list_size = ListVector::GetListSize(arrlist);
-	auto &arrlist_child = ListVector::GetEntry(arrlist);
-	UnifiedVectorFormat arrlist_child_data;
-	arrlist_child.ToUnifiedFormat(arrlist_list_size, arrlist_child_data);
+	auto input_list_list_size = ListVector::GetListSize(input_list);
+	auto &input_list_child = ListVector::GetEntry(input_list);
+	UnifiedVectorFormat input_list_child_data;
+	input_list_child.ToUnifiedFormat(input_list_list_size, input_list_child_data);
 
 	result.SetVectorType(VectorType::FLAT_VECTOR);
 	auto result_entries = FlatVector::GetData<list_entry_t>(result);
 	auto &result_validity = FlatVector::Validity(result);
 
-	// Create a reverse selection vector
-	SelectionVector rev(arrlist_list_size);
-	for (idx_t i = 0; i < arrlist_list_size; i++) {
-		rev.set_index(arrlist_list_size - i - 1, i);
+	// create a reverse selection vector
+	SelectionVector rev(input_list_list_size);
+	for (idx_t i = 0; i < input_list_list_size; i++) {
+		rev.set_index(input_list_list_size - i - 1, i);
 	}
 
 	idx_t offset = 0;
 	for (idx_t i = 0; i < count; i++) {
-		auto arrlist_list_index = arrlist_data.sel->get_index(i);
+		auto input_list_list_index = input_list_data.sel->get_index(i);
 
-		if (!arrlist_data.validity.RowIsValid(arrlist_list_index)) {
+		if (!input_list_data.validity.RowIsValid(input_list_list_index)) {
 			result_validity.SetInvalid(i);
 			continue;
 		}
 		result_entries[i].offset = offset;
 		result_entries[i].length = 0;
-		if (arrlist_data.validity.RowIsValid(arrlist_list_index)) {
-			const auto &arrlist_entry = arrlist_entries[arrlist_list_index];
-			result_entries[i].length += arrlist_entry.length;
+		if (input_list_data.validity.RowIsValid(input_list_list_index)) {
+			const auto &input_list_entry = input_list_entries[input_list_list_index];
+			result_entries[i].length += input_list_entry.length;
 
-			// Create a reverse selection vector
-			// SelectionVector rev(arrlist_entry.length);
-			// for (idx_t i = 0; i < arrlist_entry.length; i++) {
-			// 	rev.set_index(arrlist_entry.length - i - 1, i);
-			// }
-			ListVector::Append(result, arrlist_child, rev, arrlist_entry.offset + arrlist_entry.length,
-			                   arrlist_entry.offset);
+			ListVector::Append(result, input_list_child, rev, input_list_entry.offset + input_list_entry.length,
+			                   input_list_entry.offset);
 		}
-
 
 		offset += result_entries[i].length;
 	}
 	D_ASSERT(ListVector::GetListSize(result) == offset);
 
-	if (arrlist.GetVectorType() == VectorType::CONSTANT_VECTOR) {
+	if (input_list.GetVectorType() == VectorType::CONSTANT_VECTOR) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
 	}
 }
-
 
 static unique_ptr<FunctionData> ListReverseBind(ClientContext &context, ScalarFunction &bound_function,
                                                vector<unique_ptr<Expression>> &arguments) {
 	D_ASSERT(bound_function.arguments.size() == 1);
 
 
-
-		// case LogicalTypeId::SQLNULL:
-		// result.SetVectorType(VectorType::CONSTANT_VECTOR);
-		// ConstantVector::SetNull(result, true);
-		// break;
-
-
-
-	auto &arrlist = arguments[0]->return_type;
-	if (arrlist.id() == LogicalTypeId::UNKNOWN) {
+	auto &input_list = arguments[0]->return_type;
+	if (input_list.id() == LogicalTypeId::UNKNOWN) {
 		throw ParameterNotResolvedException();
 	} 
-	else if (arrlist.id() == LogicalTypeId::SQLNULL) {
-		// arrlist = LogicalType::LIST(LogicalType::SQLNULL);
-		// throw ParameterNotResolvedException();
-
-		auto return_type = arrlist.id() == LogicalTypeId::SQLNULL ? arrlist : arrlist;
+	// if the input is a NULL, we should just return a NULL
+	else if (input_list.id() == LogicalTypeId::SQLNULL) {
+		auto return_type = input_list;
 		bound_function.arguments[0] = return_type;
-		//bound_function.arguments[1] = return_type;
 		bound_function.return_type = return_type;
 	} 
 	else {
-		D_ASSERT(arrlist.id() == LogicalTypeId::LIST);
+		D_ASSERT(input_list.id() == LogicalTypeId::LIST);
 	
 		LogicalType child_type = LogicalType::SQLNULL;
 		for (const auto &argument : arguments) {
